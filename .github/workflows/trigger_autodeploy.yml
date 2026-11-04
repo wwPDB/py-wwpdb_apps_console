@@ -1,0 +1,17 @@
+name: AutoDeploy
+
+# Run this workflow every time a commit gets pushed to main or a pull request gets opened against main
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - master
+
+jobs:
+  deploy_dev:
+    name: Deploy github repository on development
+    uses: wwPDB/wwpdb-reusable-actions/.github/workflows/autodeploy.yml@main
+    secrets: inherit
+    permissions:
+      contents: read
