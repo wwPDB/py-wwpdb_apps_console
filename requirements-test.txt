@@ -1,0 +1,3 @@
+# Additional testing requirements not covered by pyproject.toml
+types-mock
+

@@ -1,2 +1,5 @@
-# py-wwpdb_apps_workmanager
-OneDep workflow manager V2
+# py-wwpdb_apps_console
+OneDep console manager
+
+Deployment is through a wsgi script 
+

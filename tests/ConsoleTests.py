@@ -15,9 +15,6 @@ if __package__ is None or __package__ == "":
     import sys
 
     sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-    from commonsetup import TESTOUTPUT  # noqa: F401 pylint: disable=import-error,unused-import
-else:
-    from .commonsetup import TESTOUTPUT  # noqa: F401
 
 from wwpdb.apps.console.console import actions, auth, catalog, jobs
 from wwpdb.apps.console.console.status_ops import compute_extended_hold_date

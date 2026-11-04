@@ -21,7 +21,10 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
 ]
 dependencies = [
-    "wwpdb.apps.workmanager"
+    "wwpdb.apps.workmanager",
+    "wwpdb.apps.wf_engine",
+    "wwpdb.utils.config",
+    "wwpdb.utils.session"
 ]
 
 requires-python = ">=3.8"
@@ -135,6 +138,6 @@ exclude = ["tests/test-output/"]
 
 
 # -------------------------  Mypy disable until stubs availabl ---------
-# [[tool.mypy.overrides]]
-# module = ["webob.*"]
-# ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["wwpdb.apps.workmanager.*", "wwpdb.apps.ann_tasks_v2.*", "wwpdb.apps.msgmodule.*", "wwpdb.apps.wf_engine.*"]
+ignore_missing_imports = true
