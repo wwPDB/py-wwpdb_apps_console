@@ -21,10 +21,13 @@ from wwpdb.apps.console.console.status_ops import compute_extended_hold_date
 
 
 class _FakeSdb(object):
-    def __init__(self, selected=None):
+    def __init__(self, selected=None, class_files=None, last_instances=None):
         self.selected = list(selected or [])
         self.added = None
         self.removed = None
+        self.class_files = dict(class_files or {})
+        self.last_instances = dict(last_instances or {})
+        self.comm_calls = []
 
     def getAnnoSelection(self, depositionids=None):
         wanted = list(depositionids or [])
@@ -38,6 +41,28 @@ class _FakeSdb(object):
     def removeFromMyList(self, deposition_id):
         self.removed = deposition_id
         self.selected = [row for row in self.selected if row != deposition_id]
+
+    def getWfClassByID(self, classID=None):
+        class_file = self.class_files.get(classID)
+        if not class_file:
+            return None
+        return {"wf_class_id": classID, "class_file": class_file}
+
+    def getLastWFInstance(self, depositionid=None, classid=None):
+        return self.last_instances.get((depositionid, classid))
+
+    def insertCommunicationCommand(self, depositionid=None, instid=None, classid=None, command=None, classname=None, dataversion=None):
+        self.comm_calls.append(
+            {
+                "depositionid": depositionid,
+                "instid": instid,
+                "classid": classid,
+                "command": command,
+                "classname": classname,
+                "dataversion": dataversion,
+            }
+        )
+        return "OK"
 
 
 class CatalogTests(unittest.TestCase):
@@ -132,6 +157,30 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(actions.run_add_to_my_todo(sdb, "D_1000000001", "DH"), "already on TO DO")
         self.assertEqual(actions.run_remove_from_my_todo(sdb, "D_1000000001", "DH"), "removed from TO DO")
         self.assertEqual(actions.run_remove_from_my_todo(sdb, "D_1000000001", "DH"), "not on TO DO")
+
+    def testLevel2RunUiUsesNoneInstanceWhenNoPriorUiRun(self):
+        # Mimics first-time Run+UI: no AnnModUI wf_instance yet.
+        sdb = _FakeSdb(class_files={"AnnModUI": "AnnotateModuleUI.xml"})
+        row = catalog.level2_module_by_id("annmod")
+        detail = actions.run_level2(sdb, "D_8000214963", row, "run_ui")
+        self.assertEqual(detail, "queued Run+UI AnnModUI")
+        self.assertEqual(len(sdb.comm_calls), 1)
+        call = sdb.comm_calls[0]
+        self.assertEqual(call["classid"], "AnnModUI")
+        self.assertEqual(call["classname"], "AnnotateModuleUI.xml")
+        self.assertEqual(call["command"], "restartGoWF")
+        self.assertEqual(call["dataversion"], "latest")
+        self.assertEqual(call["instid"], "None")
+
+    def testLevel2RunUsesPriorInstanceWhenPresent(self):
+        sdb = _FakeSdb(
+            class_files={"AnnMod": "AnnotateModule.xml"},
+            last_instances={("D_8000214963", "AnnMod"): {"wf_inst_id": "W_017"}},
+        )
+        row = catalog.level2_module_by_id("annmod")
+        detail = actions.run_level2(sdb, "D_8000214963", row, "run")
+        self.assertEqual(detail, "queued Run AnnMod")
+        self.assertEqual(sdb.comm_calls[0]["instid"], "W_017")
 
 
 if __name__ == "__main__":
