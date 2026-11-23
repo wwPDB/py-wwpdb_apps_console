@@ -5,7 +5,6 @@
 """Per-deposition backends for console actions (To Do, Level 2, Status, Communication, AnnMod)."""
 
 from wwpdb.apps.console.console import catalog
-from wwpdb.apps.workmanager.db_access.StatusDbApi import StatusDbApi
 
 
 def _level2_class_id(module_row, operation):
@@ -45,7 +44,12 @@ def run_remove_from_my_todo(sdb, deposition_id, annotator):  # pylint: disable=u
 def run_level2(sdb, deposition_id, module_row, operation):
     class_id = _level2_class_id(module_row, operation)
     class_file = _level2_class_file(sdb, class_id, operation)
-    instance_id = None
+    # communication.parent_wf_inst_id is NOT NULL. WFM Level 2 Run / Run+UI /
+    # Restart buttons always pass the literal string "None"; omitting it (Python
+    # None) makes insertCommunicationCommand write Null and the UPDATE fails
+    # with "Start Annotate workflow failed." That hits Run+UI hardest because
+    # *UI classes usually have no prior wf_instance row.
+    instance_id = "None"
     last = sdb.getLastWFInstance(depositionid=deposition_id, classid=class_id)
     if last and last.get("wf_inst_id"):
         instance_id = last["wf_inst_id"]
@@ -64,6 +68,8 @@ def run_level2(sdb, deposition_id, module_row, operation):
 
 
 def run_action(site_id, action_id, deposition_id, annotator, extra, verbose=False, log=None, req_obj=None):
+    from wwpdb.apps.workmanager.db_access.StatusDbApi import StatusDbApi
+
     sdb = StatusDbApi(siteId=site_id, verbose=verbose, log=log)
     if action_id == catalog.ACTION_ADD_TO_MY_TODO:
         return run_add_to_my_todo(sdb, deposition_id, annotator)
