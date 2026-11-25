@@ -8,11 +8,11 @@
 name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
 
 trigger:
-- master
+- main
 - develop 
 
 pr:
-- master
+- main
 - develop
 
 schedules:
@@ -20,7 +20,7 @@ schedules:
   displayName: Weekly Sunday build
   branches:
     include:
-    - master
+    - main
     - develop
   always: true
 

@@ -17,7 +17,7 @@ jobs:
 - job: ${{ format('publish_{0}_{1}', parameters.tox, parameters.os) }}
 
   variables:
-    isMaster: $[eq(variables['Build.SourceBranch'], 'refs/heads/master')] 
+    isMain: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')] 
     isDevelop: $[eq(variables['Build.SourceBranch'], 'refs/heads/develop')] 
 
   pool:
@@ -27,7 +27,7 @@ jobs:
       vmImage: 'ubuntu-latest'
   dependsOn:
   - ${{ format('build_test_{0}_{1}', parameters.tox, parameters.os) }}
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMaster, true))
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
   #
   steps:
     - task: UsePythonVersion@0
