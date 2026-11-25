@@ -15,6 +15,51 @@ from wwpdb.apps.console.console import catalog
 _DEP_ID = re.compile(r"^D_\d+$", re.I)
 
 
+_DEP = re.compile(r"^D_?\d+$", re.I)
+_PDB = re.compile(r"^[0-9][A-Za-z0-9]{3}$")
+_EMD = re.compile(r"^EMD(?:B)?-?\d+$", re.I)
+_BMRB = re.compile(r"^\d+$")
+_SAS = re.compile(r"^SAS[A-Za-z0-9]+$", re.I)
+
+
+def parse_entry_tokens(raw):
+    """Identifiers for a set-level archive edit.
+
+    Accepts deposition ids and PDB, EMDB, BMRB, and SAS codes. Raises ValueError
+    when a token is not one of those, so a typo is not silently dropped.
+    """
+    tokens = []
+    seen = set()
+    rejected = []
+    for part in re.split(r"[\s,;]+", str(raw or "")):
+        text = part.strip()
+        if not text or text.startswith("#"):
+            continue
+        if _DEP.match(text):
+            norm = "D_" + re.sub(r"\D", "", text)
+        elif _EMD.match(text):
+            norm = "EMD-" + re.sub(r"\D", "", text)
+        elif _SAS.match(text):
+            norm = text.upper()
+        elif _PDB.match(text):
+            norm = text.upper()
+        elif _BMRB.match(text):
+            norm = text
+        else:
+            rejected.append(text)
+            continue
+        key = norm.upper()
+        if key not in seen:
+            seen.add(key)
+            tokens.append(norm)
+    if rejected:
+        raise ValueError(
+            "Unrecognized identifier(s): %s. Use a deposition ID (D_…) or a PDB, EMDB, or BMRB code."
+            % ", ".join(rejected)
+        )
+    return tokens
+
+
 def parse_deposition_ids(raw):
     ids = []
     seen = set()
@@ -77,7 +122,7 @@ def new_job(session_path, action_id, annotator, deposition_ids, extra=None):
     os.makedirs(dest)
     rows = []
     for dep_id in deposition_ids:
-        rows.append({"deposition_id": dep_id, "status": "waiting", "error": ""})
+        rows.append({"deposition_id": dep_id, "status": "waiting", "error": "", "detail": "", "outcome": ""})
     progress = {
         "job_id": job_id,
         "action_id": action_id,
@@ -134,7 +179,7 @@ def append_log(session_path, job_id, line):
     _atomic_write_json(_progress_path(session_path, job_id), progress)
 
 
-def set_row(session_path, job_id, deposition_id, status, error=""):
+def set_row(session_path, job_id, deposition_id, status, error="", detail=None, outcome=None):
     progress = load_progress(session_path, job_id)
     if not progress:
         return
@@ -142,6 +187,10 @@ def set_row(session_path, job_id, deposition_id, status, error=""):
         if row.get("deposition_id") == deposition_id:
             row["status"] = status
             row["error"] = error or ""
+            if detail is not None:
+                row["detail"] = detail
+            if outcome is not None:
+                row["outcome"] = outcome
             break
     counts = {"ok": 0, "failed": 0, "running": 0, "waiting": 0}
     for row in progress.get("rows") or []:

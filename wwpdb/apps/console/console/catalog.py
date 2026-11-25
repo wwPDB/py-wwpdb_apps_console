@@ -17,6 +17,16 @@ ACTION_ADD_INTERNAL_NOTE = "add_internal_note"
 ACTION_SET_INTERNAL_NOTES_FLAG = "set_internal_notes_flag"
 ACTION_ANNMOD_FINISH = "annmod_finish"
 ACTION_ANNMOD_ASSIGN_ALL_MONOMERS = "annmod_assign_all_monomers"
+ACTION_MAKE_RELATED_ENTRIES = "make_related_entries"
+
+# One job uses the whole id list. Each entry's edit can depend on the others.
+SET_LEVEL_ACTION_IDS = frozenset((ACTION_MAKE_RELATED_ENTRIES,))
+MAX_RELATED_ENTRIES = 30
+EM_CONTENT_TYPES = (
+    "other EM volume",
+    "consensus EM volume",
+    "focused EM volume",
+)
 
 IMPLEMENTED_ACTION_IDS = frozenset(
     (
@@ -31,6 +41,7 @@ IMPLEMENTED_ACTION_IDS = frozenset(
         ACTION_SET_INTERNAL_NOTES_FLAG,
         ACTION_ANNMOD_FINISH,
         ACTION_ANNMOD_ASSIGN_ALL_MONOMERS,
+        ACTION_MAKE_RELATED_ENTRIES,
     )
 )
 
@@ -46,6 +57,7 @@ ACTION_LABELS = {
     ACTION_SET_INTERNAL_NOTES_FLAG: "Enable or disable internal notes",
     ACTION_ANNMOD_FINISH: "Open AnnMod and Finish",
     ACTION_ANNMOD_ASSIGN_ALL_MONOMERS: "Open AnnMod, assign all monomers, and Finish",
+    ACTION_MAKE_RELATED_ENTRIES: "Make related entries",
 }
 
 # Communication UI ids (cmps_*) and the context_type stored on the message.
@@ -135,6 +147,25 @@ def validate_hold_months(raw):
     if months not in ("3", "6"):
         raise ValueError("Choose 3 or 6 months.")
     return months
+
+
+def validate_em_content_type(raw):
+    val = str(raw or "").strip()
+    if not val:
+        return EM_CONTENT_TYPES[0]
+    if val not in EM_CONTENT_TYPES:
+        raise ValueError("Choose an EM content type.")
+    return val
+
+
+def validate_dry_run(raw):
+    """True means report only. An empty value is a dry run."""
+    val = str(raw or "").strip().lower()
+    if val in ("", "1", "yes", "true", "on", "dry_run", "dry-run"):
+        return True
+    if val in ("0", "no", "false", "off", "write"):
+        return False
+    raise ValueError("Choose dry run or write.")
 
 
 def validate_notes_flag(raw):

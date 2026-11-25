@@ -7,7 +7,7 @@
 import sys
 import traceback
 
-from wwpdb.apps.console.console import actions, auth, catalog, jobs
+from wwpdb.apps.console.console import actions, auth, catalog, jobs, related_entries
 from wwpdb.apps.workmanager.db_access.StatusDbApi import StatusDbApi
 from wwpdb.utils.session.WebRequest import ResponseContent
 
@@ -63,6 +63,10 @@ class ConsoleOps(object):
                 raise ValueError("Enter a note subject and body.")
         elif action_id == catalog.ACTION_SET_INTERNAL_NOTES_FLAG:
             extra["notes_flag"] = catalog.validate_notes_flag(self.__reqObj.getValue("notes_flag"))
+        elif action_id == catalog.ACTION_MAKE_RELATED_ENTRIES:
+            extra["em_content_type"] = catalog.validate_em_content_type(self.__reqObj.getValue("em_content_type"))
+            extra["dry_run"] = catalog.validate_dry_run(self.__reqObj.getValue("dry_run"))
+            extra["mode_label"] = "Dry run" if extra["dry_run"] else "Write"
         return extra
 
     def login(self):
@@ -106,6 +110,64 @@ class ConsoleOps(object):
             }
         )
 
+    def _start_make_related(self, user):
+        """One job for the whole set. Dry run is the default; write is explicit."""
+        try:
+            tokens = jobs.parse_entry_tokens(self.__reqObj.getValue("deposition_ids"))
+            if len(tokens) < 2:
+                raise ValueError("Enter at least two deposition or accession ids.")
+            if len(tokens) > catalog.MAX_RELATED_ENTRIES:
+                raise ValueError("At most %s ids in one run." % catalog.MAX_RELATED_ENTRIES)
+            extra = self._extra_for_action(catalog.ACTION_MAKE_RELATED_ENTRIES)
+            lookup = related_entries.SqlDepositionLookup()
+            archive = related_entries.PathInfoArchive(
+                self.__siteId, self.__sessionPath, verbose=self.__verbose, log=self.__lfh
+            )
+            plan = related_entries.prepare(tokens, extra["em_content_type"], lookup, archive)
+        except ValueError as exc:
+            return self._json(error=str(exc))
+        except Exception as exc:  # noqa: BLE001
+            traceback.print_exc(file=self.__lfh)
+            return self._json(error=str(exc) or "Could not prepare related entries.")
+        depids = list(plan["deposition_ids"])
+        if len(depids) < 2:
+            return self._json(error="At least two depositions are required.")
+        if len(depids) > catalog.MAX_RELATED_ENTRIES:
+            return self._json(error="At most %s depositions in one run." % catalog.MAX_RELATED_ENTRIES)
+        extra["citations"] = list(plan["citations"])
+        annotator = user["annotator"]
+        progress = jobs.new_job(
+            self.__sessionPath, catalog.ACTION_MAKE_RELATED_ENTRIES, annotator, depids, extra=extra
+        )
+        job_id = progress["job_id"]
+        mode = "dry run" if extra["dry_run"] else "write"
+        title = catalog.action_label(catalog.ACTION_MAKE_RELATED_ENTRIES)
+        jobs.append_log(
+            self.__sessionPath,
+            job_id,
+            "Started %s as %s (%s, %s IDs)" % (title, annotator, mode, len(depids)),
+        )
+        for cite in plan["citations"]:
+            cited = "%s %s (%s)" % (cite["db_name"], cite["db_id"], cite["content_type"])
+            jobs.append_log(
+                self.__sessionPath,
+                job_id,
+                "%s cited as %s" % (cite["deposition_id"], cited),
+            )
+        try:
+            cancelled = related_entries.apply_plan(
+                self.__sessionPath, job_id, plan, extra["dry_run"], archive
+            )
+        except Exception as exc:  # noqa: BLE001
+            traceback.print_exc(file=self.__lfh)
+            jobs.finish_job(self.__sessionPath, job_id, status="done", error=str(exc) or "Action failed.")
+            return self._json(jobs.load_progress(self.__sessionPath, job_id))
+        if cancelled:
+            jobs.finish_job(self.__sessionPath, job_id, status="done", error="Cancelled.")
+        else:
+            jobs.finish_job(self.__sessionPath, job_id, status="done")
+        return self._json(jobs.load_progress(self.__sessionPath, job_id))
+
     def start(self):
         try:
             user = auth.require_console_user(self.__sessionPath, self.__reqObj.getValue("annotator"))
@@ -114,6 +176,8 @@ class ConsoleOps(object):
         action_id = str(self.__reqObj.getValue("action_id") or "").strip()
         if action_id not in catalog.IMPLEMENTED_ACTION_IDS:
             return self._json(error="Unknown or not-yet-implemented action.")
+        if action_id in catalog.SET_LEVEL_ACTION_IDS:
+            return self._start_make_related(user)
         deposition_ids = jobs.parse_deposition_ids(self.__reqObj.getValue("deposition_ids"))
         if not deposition_ids:
             return self._json(error="No valid deposition IDs (expected D_1234567890).")
