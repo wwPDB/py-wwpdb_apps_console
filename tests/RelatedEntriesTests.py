@@ -161,6 +161,24 @@ class PrepareTests(unittest.TestCase):
             _Archive({}),
         )
 
+    def testPaddedExtendedIdFallsBackToClassic(self):
+        depids = related_entries.resolve_entry_identifiers(["pdb_00001abc", "PDB_00001ABD"], self._lookup())
+        self.assertEqual(depids, ["D_1000000001", "D_1000000002"])
+
+    def testExtendedIdStoredAsExtendedDoesNotNeedClassic(self):
+        lookup = self._lookup()
+        lookup.by_code["PDB_1001BA3C"] = "D_1000000009"
+        depids = related_entries.resolve_entry_identifiers(["pdb_1001ba3c"], lookup)
+        self.assertEqual(depids, ["D_1000000009"])
+
+    def testPaddedNonClassicExtendedDoesNotFallBack(self):
+        self.assertRaises(
+            ValueError,
+            related_entries.resolve_entry_identifiers,
+            ["pdb_0000abcd"],
+            self._lookup(),
+        )
+
     def testUnknownAccession(self):
         self.assertRaises(
             ValueError,

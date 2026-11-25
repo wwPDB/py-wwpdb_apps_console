@@ -10,6 +10,7 @@ unchanged and is not imported here.
 """
 
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -212,6 +213,21 @@ def describe_related_result(updated, rows, error, dry_run):
     return verb + " " + "; ".join(parts)
 
 
+_CLASSIC_PDB_ID = re.compile(r"^[0-9][a-z0-9]{3}$")
+
+
+def _classic_from_padded_extended(identifier):
+    """Return 1abc for pdb_00001abc. Other extended IDs have no classic form."""
+    text = str(identifier or "").lower()
+    prefix = "pdb_0000"
+    if not text.startswith(prefix) or len(text) != len(prefix) + 4:
+        return None
+    classic = text[len(prefix):]
+    if _CLASSIC_PDB_ID.match(classic):
+        return classic
+    return None
+
+
 def _resolve_depid(identifier, lookup):
     identifier = identifier.strip()
     if not identifier:
@@ -221,6 +237,11 @@ def _resolve_depid(identifier, lookup):
     found = lookup.dep_id_for_pdb_or_emdb(identifier)
     if found:
         return found
+    classic = _classic_from_padded_extended(identifier)
+    if classic:
+        found = lookup.dep_id_for_pdb_or_emdb(classic)
+        if found:
+            return found
     if identifier.isdigit():
         found = lookup.dep_id_for_bmrb(identifier)
         if found:
