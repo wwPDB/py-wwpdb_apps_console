@@ -228,11 +228,16 @@ class PrepareTests(unittest.TestCase):
 
 class TokenAndCatalogTests(unittest.TestCase):
     def testParseTokens(self):
-        tokens = jobs.parse_entry_tokens("1abc, EMD-1001 D1000000001\n34567 SASDA1 #note")
-        self.assertEqual(tokens, ["1ABC", "EMD-1001", "D_1000000001", "34567", "SASDA1"])
+        tokens = jobs.parse_entry_tokens("1abc, EMD-1001 D1000000001\n34567 SASDA1 pdb_1001ba3c PDB_00001ABC #note")
+        self.assertEqual(
+            tokens,
+            ["1ABC", "EMD-1001", "D_1000000001", "34567", "SASDA1", "pdb_1001ba3c", "pdb_00001abc"],
+        )
 
     def testRejectsJunk(self):
         self.assertRaises(ValueError, jobs.parse_entry_tokens, "1abc not-an-id")
+        self.assertRaises(ValueError, jobs.parse_entry_tokens, "pdb_1234")
+        self.assertRaises(ValueError, jobs.parse_entry_tokens, "pdb_000011abcd")
 
     def testEmContentTypeAndDryRun(self):
         self.assertEqual(catalog.validate_em_content_type(""), "other EM volume")

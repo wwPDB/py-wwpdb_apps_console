@@ -16,7 +16,9 @@ _DEP_ID = re.compile(r"^D_\d+$", re.I)
 
 
 _DEP = re.compile(r"^D_?\d+$", re.I)
+# Classic PDB ID, and the extended form from deposit common.utils (_EXTENDED_PDB_ID): pdb_ + 8 alphanumerics.
 _PDB = re.compile(r"^[0-9][A-Za-z0-9]{3}$")
+_PDB_EXTENDED = re.compile(r"^pdb_[A-Za-z0-9]{8}$", re.I)
 _EMD = re.compile(r"^EMD(?:B)?-?\d+$", re.I)
 _BMRB = re.compile(r"^\d+$")
 _SAS = re.compile(r"^SAS[A-Za-z0-9]+$", re.I)
@@ -25,8 +27,8 @@ _SAS = re.compile(r"^SAS[A-Za-z0-9]+$", re.I)
 def parse_entry_tokens(raw):
     """Identifiers for a set-level archive edit.
 
-    Accepts deposition ids and PDB, EMDB, BMRB, and SAS codes. Raises ValueError
-    when a token is not one of those, so a typo is not silently dropped.
+    Accepts deposition ids and PDB (classic or extended), EMDB, BMRB, and SAS codes.
+    Raises ValueError when a token is not one of those, so a typo is not silently dropped.
     """
     tokens = []
     seen = set()
@@ -41,6 +43,8 @@ def parse_entry_tokens(raw):
             norm = "EMD-" + re.sub(r"\D", "", text)
         elif _SAS.match(text):
             norm = text.upper()
+        elif _PDB_EXTENDED.match(text):
+            norm = text.lower()
         elif _PDB.match(text):
             norm = text.upper()
         elif _BMRB.match(text):
