@@ -89,7 +89,9 @@ def send_template(req_obj, deposition_id, annotator, template_id, verbose=False,
             raise ValueError("Failed to send extension message.")
         return "sent %s" % row["label"]
 
-    mio.initializeDataStore()
+    # modelFileData.db is the first entry opened in this console session.
+    # Validation, default, withdrawn, and system-unlocked read this deposition's own model.
+    mio.loadDepositionModel(deposition_id)
     template_dict = {"identifier": deposition_id}
     mio.getMsgTmpltDataItems(template_dict)
     starter = mio.getStarterMsgBody()
